@@ -1,3 +1,4 @@
+#%%
 from datetime import datetime, timedelta
 import matplotlib.dates as mdates
 
@@ -167,6 +168,7 @@ def plot_trends(df, ticker):
     :param ticker (str): Stock ticker
     :return: None, just plot the trends
     '''
+    df['Date'] = df.index
     plt.figure(figsize=(14, 7))
     df_filtered = df[df['Date'] >= datetime.now() - timedelta(days=3*365)]
     plt.plot(df_filtered['Date'], df_filtered['Close'], label='Close Price')
@@ -207,7 +209,8 @@ def calculate_daily_return(df):
     :param df (DataFrame): Input DataFrame
     :return: DataFrame with 'Daily Return' column added
     """
-    df['Daily Return'] = (df['Close'] - df['Open']) / df['Open']
+    df['Daily Return'] = df['Close'].pct_change(fill_method=None)
+    #df['Daily Return'] = (df['Close'] - df['Open']) / df['Open']
     return df
 
 def calculate_average_daily_return(df):
@@ -218,9 +221,10 @@ def calculate_average_daily_return(df):
     """
     df = calculate_daily_return(df)
     avg_daily_return = {
-        'weekly': df['Daily Return'].resample('W').mean(),
-        'monthly': df['Daily Return'].resample('ME').mean(),
-        'yearly': df['Daily Return'].resample('YE').mean(),
+        'daily': df['Daily Return'].mean(),
+        'weekly': df['Daily Return'].resample('W').mean().mean(),
+        'monthly': df['Daily Return'].resample('ME').mean().mean(),
+        'yearly': df['Daily Return'].resample('YE').mean().mean(),
     }
     return avg_daily_return
 
@@ -598,6 +602,8 @@ def calculate_ao(df, short_window=5, long_window=34):
     :param long_window (int): Long window size for the AO
     :return: dataFrame, the DataFrame with the AO added
     """
+    df = ensure_datetime_index(df)
+
     median_price = (df['High'] + df['Low']) / 2
     df['AO'] = median_price.rolling(window=short_window).mean() - median_price.rolling(window=long_window).mean()
     return df
@@ -609,6 +615,7 @@ def plot_close_price_with_ao(df, ticker):
     :param ticker (str): Stock ticker
     :return: None, just plot the Close Price and AO
     '''
+
     end_date = datetime.now()
     start_date = end_date - timedelta(days=365)
 
@@ -657,7 +664,7 @@ def simulate_portfolio(data, initial_balance=10000, risk_profile='modéré', str
     :return: dict, the portfolio with the stock allocations
     '''
     allocations = {
-        'conservateur': {'AAPL': 0.15, 'MSFT': 0.15, 'AMZN': 0.15, 'GOOG': 0.15, 'TSLA': 0.15, 'ZM': 0.15, 'META': 0.15},
+        'défensif': {'AAPL': 0.15, 'MSFT': 0.15, 'AMZN': 0.15, 'GOOG': 0.15, 'TSLA': 0.15, 'ZM': 0.15, 'META': 0.15},
         'modéré': {'AAPL': 0.15, 'MSFT': 0.15, 'AMZN': 0.15, 'GOOG': 0.15, 'TSLA': 0.15, 'ZM': 0.15, 'META': 0.15},
         'agressif': {'AAPL': 0.15, 'MSFT': 0.15, 'AMZN': 0.15, 'GOOG': 0.15, 'TSLA': 0.15, 'ZM': 0.15, 'META': 0.15},
         'everything': {'AAPL': 0.15, 'MSFT': 0.15, 'AMZN': 0.15, 'GOOG': 0.15, 'TSLA': 0.15, 'ZM': 0.15, 'META': 0.15}
@@ -673,6 +680,7 @@ def simulate_portfolio(data, initial_balance=10000, risk_profile='modéré', str
     end_date = datetime.now().strftime('%Y-%m-%d')
 
     date_range = pd.date_range(start=start_date, end=end_date, freq='D').strftime('%Y-%m-%d')
+
 
     for ticker, df in data.items():
         try:
@@ -802,14 +810,14 @@ def simulate_portfolio(data, initial_balance=10000, risk_profile='modéré', str
 
 def simulate_combined_strategy(data, initial_balance=10000, risk_profile='everything', months=6):
     allocations = {
-        'conservateur': {'AAPL': 0.15, 'MSFT': 0.15, 'AMZN': 0.15, 'GOOG': 0.15, 'TSLA': 0.15, 'ZM': 0.15, 'META': 0.15},
+        'défensif': {'AAPL': 0.15, 'MSFT': 0.15, 'AMZN': 0.15, 'GOOG': 0.15, 'TSLA': 0.15, 'ZM': 0.15, 'META': 0.15},
         'modéré': {'AAPL': 0.15, 'MSFT': 0.15, 'AMZN': 0.15, 'GOOG': 0.15, 'TSLA': 0.15, 'ZM': 0.15, 'META': 0.15},
         'agressif': {'AAPL': 0.15, 'MSFT': 0.15, 'AMZN': 0.15, 'GOOG': 0.15, 'TSLA': 0.15, 'ZM': 0.15, 'META': 0.15},
         'everything': {'AAPL': 0.15, 'MSFT': 0.15, 'AMZN': 0.15, 'GOOG': 0.15, 'TSLA': 0.15, 'ZM': 0.15, 'META': 0.15}
     }
 
     risk_parameters = {
-        'conservateur': {'buy_threshold': 2, 'sell_threshold': 1},
+        'défensif': {'buy_threshold': 2, 'sell_threshold': 1},
         'modéré': {'buy_threshold': 1, 'sell_threshold': 2},
         'agressif': {'buy_threshold': 1, 'sell_threshold': 3}
     }
@@ -920,3 +928,369 @@ def simulate_combined_strategy(data, initial_balance=10000, risk_profile='everyt
             final_value += shares * data[ticker].loc[last_date, 'Close']
 
     return final_value, portfolio
+# Assurer que 'Date' est une colonne dans le DataFrame
+def ensure_date_column(df):
+    if df.index.name == 'Date':
+        df = df.reset_index()
+    return df
+def ensure_datetime_index(df):
+    """
+    Ensure that the DataFrame has a datetime index.
+    :param df (pd.DataFrame): Input DataFrame
+    :return: pd.DataFrame with datetime index
+    """
+    if df.index.name != 'Date':
+        if 'Date' in df.columns:
+            df['Date'] = pd.to_datetime(df['Date'])
+            df.set_index('Date', inplace=True)
+    return df
+
+def calculate_indicators(df):
+    """
+    Calculate the technical indicators for a stock
+    :param df (pd.DataFrame): Input DataFrame
+    :return: pd.DataFrame with the technical indicators
+    """
+    df = ensure_datetime_index(df)
+    df = calculate_rsi(df)
+    df = calculate_macd(df)
+    df = calculate_ao(df)
+    df = calculate_ichimoku(df)
+    df = calculate_moving_average(df, 'Close', 20)
+    df = calculate_moving_average(df, 'Close', 50)
+    df = calculate_bollinger_bands(df)
+    df = calculate_monthly_returns(df)
+
+    return df
+
+#%% md
+Group composed of 5 students:
+- Student 1: DAVOINE Amaury 20200894
+- Student 2: CLOTTEAU Mathis 20200544
+- Student 3: BERTHAULT Alexandre
+- Student 4: BOUCHER Mayeul
+- Student 5: DA SILVA Marc-Antoine
+#%%
+
+#%% md
+## Download / Load Data
+
+We download the data from the ```yfinance``` library. We download the data for the following stocks:
+    - AAPL (Apple Inc.)
+- MSFT (Microsoft Corporation)
+- AMZN (Amazon.com Inc.)
+- META (Facebook Inc.)
+- GOOG (Alphabet Inc.)
+- TSLA (Tesla Inc.)
+- ZM (Zoom Video Communications Inc.)
+
+Afterwards, we save the data in CSV files for further analysis.
+
+#%%
+import os
+
+tickers = ["AAPL", "MSFT","AMZN", "META", "GOOG", "TSLA", "ZM" ]
+start_date = (datetime.now() - timedelta(days=30*365)).strftime('%Y-%m-%d')
+end_date = datetime.now().strftime('%Y-%m-%d')
+os.makedirs("data", exist_ok=True)
+data = {}
+for ticker in tickers:
+    df = yf.download(ticker, start=start_date, end=end_date)
+    df.reset_index(inplace=True)
+    df['Date'] = pd.to_datetime(df['Date'])
+    df.set_index('Date', inplace=True)
+    df = df[['Open', 'High', 'Low', 'Close', 'Volume']]
+    data[ticker] = df
+    df.to_csv(f"data/{ticker}_historical_data.csv")
+    df = ensure_datetime_index(df)
+    print(df.head())
+    print(df.tail())
+
+
+#%% md
+## Data exploration
+
+In this part, we'll explore, preprocess, and clean the data for each stock. Firstly, we display the 40 first and last rows, counting the observations, deducing the data periodicity, calculating descriptive statistics, and identifying and handling missing values.
+#%%
+cleaned_data = {}
+
+for ticker, df in data.items():
+    print(f"\nExploration des données pour {ticker} :")
+    print(f"Premières et dernières lignes :")
+    display_first_last_rows(df)
+for ticker, df in data.items():
+    print(f"Nombre d'observations pour {ticker}: {count_observations(df)}")
+for ticker, df in data.items():
+    print(f"Période entre les points de données : {deduce_periodicity(df)}")
+
+for ticker, df in data.items():
+    print("Statistiques descriptives :")
+    print(descriptive_statistics(df))
+for ticker, df in data.items():
+    print(f"Valeurs manquantes pour {ticker} :")
+    print(identify_missing_values(df))
+    df = handle_missing_values(df)  # Handle missing values
+    cleaned_data[ticker] = df
+
+for ticker, df in cleaned_data.items():
+    print(f"Valeurs manquantes pour {ticker} après nettoyage :")
+    print(identify_missing_values(df))
+
+#%% md
+## Anomalies Detection
+
+In this part, we'll detect and handle anomalies in the data. We'll plot the stock data with anomalies to visualize them. All the anomalies, detected with the IQR Method will be replaced by the mean value of the column over a certain time window (1 year).
+The IQR method works as follows:
+- Calculate the first quartile Q1 (25th percentile)
+- Calculate the third quartile Q3 (75th percentile)
+- Calculate the Interquartile Range :  $$IQR = Q_3 - Q_1$$
+- Calculate the lowerbound $$lower bound = Q_1 - 1.5 * IQR$$
+- Calculate the upperbound $$upper bound = Q_3 + 1.5 * IQR$$
+
+- Replace all the values below the lower bound or above the upper bound by the mean value of the column over a certain time window (1 year).
+
+#%%
+for ticker, df in data.items():
+    print(f"Nettoyage des données pour {ticker} :")
+    for column in ['Open', 'High', 'Low', 'Close']:
+        print(f"Traitement de la colonne {column} :")
+        df = handle_anomalies(df=df, column=column, stock_name=ticker)
+    cleaned_data[ticker] = df
+#%% md
+## Verification of anomalies handling
+
+We use the same method as before to plot the anomalies, to check that there are no more anomalies in the data.
+#%%
+for ticker, df in cleaned_data.items():
+    for column in ['Open', 'High', 'Low', 'Close']:
+        plot_stock_data_with_anomalies(cleaned_data, ticker, column, is_anomalies=False)
+
+#%% md
+## Saving cleaned data
+
+We save the cleaned data in CSV files for further analysis, and display the first and last rows of the cleaned data.
+#%%
+
+os.makedirs("cleaned_data", exist_ok=True)
+for ticker, df in cleaned_data.items():
+    df.to_csv(f"cleaned_data/{ticker}_cleaned_data.csv", index=False)
+    print(df.head())
+    print(df.tail())
+
+#%% md
+## **Average of Opening and Closing Prices for Each Stock and Different Time Periods**
+
+We calculate the average opening and closing prices for each stock and different time periods (day, week, month, year), then display it.
+
+#%%
+
+# Calculate average prices for each stock
+for ticker, df in cleaned_data.items():
+    avg_prices = calculate_average_prices(df)
+    print(f"\nAverage prices for {ticker}:")
+    for period, prices in avg_prices.items():
+        print(f"\n{period.capitalize()} average prices for {ticker}:")
+        print(prices)
+
+#%% md
+## **Day-to-Day and Month-to-Month Stock Price Changes**
+
+We calculate the day-to-day and month-to-month price changes for each stock, then display it.
+#%%
+for ticker, df in cleaned_data.items():
+    df = calculate_price_changes(df)
+    cleaned_data[ticker] = df
+    print(f"\nPrice changes for {ticker}:")
+    print(df[['Daily Change', 'Monthly Change']].fillna(df['Monthly Change'].mean()).head())
+
+#%% md
+## **Daily Return Based on Opening and Closing Prices**
+
+Compute the daily return for each stock based on the opening and closing prices, then display it.
+
+#%%
+for ticker, df in cleaned_data.items():
+    df = ensure_date_column(df)
+    df = calculate_daily_return(df)
+    cleaned_data[ticker] = df
+    print(f"\nDaily return for {ticker}:")
+    print(df[['Date', 'Daily Return']].dropna().head())
+    print(df.head())
+    print(df.tail())
+
+#%% md
+## **Stock with the Highest Daily Return**
+
+We calculate the average daily return for each stock, then display the stock with the highest average daily return. In this case, the highest average daily return is from Tesla, with 0.2% a day in average, which is corresponding to 20% a year.
+#%%
+average_daily_return = {}
+
+for ticker, df in cleaned_data.items():
+    df = calculate_daily_return(df)
+    avg_return = df['Daily Return'].mean()
+    average_daily_return[ticker] = avg_return
+print("\nAverage daily return for each stock:"
+      f"\n{average_daily_return}")
+
+best_stock = max(average_daily_return, key=average_daily_return.get)
+print(f"\nStock with the highest average daily return: {best_stock} with an average return of {average_daily_return[best_stock]}")
+
+#%% md
+## **Average Daily Return for Different Periods (Week, Month, Year)**
+
+#%%
+average_daily_return = {}
+
+for ticker, df in cleaned_data.items():
+    df = ensure_datetime_index(df)
+    avg_return = calculate_average_daily_return(df)
+    average_daily_return[ticker] = avg_return
+
+for ticker, avg_return in average_daily_return.items():
+    print(f"\nAverage daily return for {ticker}:")
+    print(avg_return)
+
+frequency = 'yearly'
+
+# Identifier l'action avec le retour quotidien moyen le plus élevé
+best_stock = None
+highest_return = 0
+
+for ticker, returns in average_daily_return.items():
+    current_return = returns[frequency].mean()
+    if current_return > highest_return:
+        highest_return = current_return
+        best_stock = ticker
+
+print(f"\nStock with the highest average daily return: {best_stock} with an average {frequency} return of {highest_return}")
+
+#%%
+for ticker, df in cleaned_data.items():
+    df = calculate_moving_average(df, 'Close', 20)
+    df = calculate_moving_average(df, 'Close', 50)
+    df = calculate_moving_average(df, 'Close', 200)
+    plot_trends(df, ticker)
+#%%
+for ticker, df in cleaned_data.items():
+    print(f"\nStatistiques descriptives pour {ticker} :")
+    print(descriptive_statistics(df))
+
+for ticker, df in cleaned_data.items():
+    print(f"Volatilité pour {ticker} : {calculate_volatility(df):.4f}")
+
+#%%
+for ticker, df in cleaned_data.items():
+    print(df.head())
+    print(df.tail())
+#%%
+performance_data = []
+for ticker, df in cleaned_data.items():
+    total_return = calculate_performance(df)
+    annualized_return = calculate_annualized_return(df)
+    sharpe_ratio = calculate_sharpe_ratio(df)
+    volatility = calculate_volatility(df)
+    performance_data.append({
+        'Ticker': ticker,
+        'Total Return': total_return,
+        'Annualized Return': annualized_return,
+        'Sharpe Ratio': sharpe_ratio,
+        'Volatility': volatility
+    })
+#%%
+performance_df = pd.DataFrame(performance_data)
+print(performance_df)
+
+# Analyse de corrélation entre les actions
+correlation_matrix = calculate_correlation(cleaned_data)
+print("Matrice de corrélation :")
+print(correlation_matrix)
+
+#%%
+# calculate and plot the bollings
+
+plot_bollinger_bands(cleaned_data, tickers)
+
+#%%
+
+#%%
+end_date = datetime.now()
+start_date = end_date - timedelta(days=3*365)
+
+for ticker in tickers:
+    df = cleaned_data[ticker]
+    df = calculate_macd(df)
+    df = calculate_rsi(df)
+
+    # Filter data for the last 3 years
+    df_filtered = df[df['Date'] >= start_date]
+    plot_close_price_with_rsi(df_filtered, ticker)
+    plot_macd(ticker)
+#%%
+end_date = datetime.now()
+start_date = end_date - timedelta(days=3*365)
+for ticker in tickers:
+    df = cleaned_data[ticker]
+    df = calculate_rsi(df)
+    plot_rsi(ticker)
+#%%
+
+end_date = datetime.now()
+start_date = end_date - timedelta(days=3*365)
+for ticker in tickers:
+    df = cleaned_data[ticker]
+    df = calculate_macd(df)
+
+    # Filter data for the last 3 years
+    df_filtered = df[df['Date'] >= start_date]
+    plot_close_price_with_macd(df_filtered, ticker)
+
+#%%
+
+plot_closing_price_and_ichimoku(tickers, cleaned_data)
+#%%
+process_and_plot_seasonality(2014)
+#%%
+for ticker, df in cleaned_data.items():
+    df = calculate_ao(df)
+    cleaned_data[ticker] = df
+    plot_close_price_with_ao(df, ticker)
+#%%
+
+for ticker, df in cleaned_data.items():
+    cleaned_data[ticker] = calculate_indicators(df)
+
+#%%
+
+strategies = ['ao', 'rsi', 'macd', 'ichimoku', 'ma', 'bollinger','seasonality']
+results = []
+
+for strategy in strategies:
+    final_value, portfolio = simulate_portfolio(cleaned_data, risk_profile='modéré', strategy=strategy)
+    results.append({
+        'Strategy': strategy,
+        'Final Value': final_value,
+        'Portfolio': portfolio
+    })
+
+for result in results:
+    print(f"Strategy: {result['Strategy']}")
+    print(f"Final Value: {result['Final Value']}")
+    print(f"Portfolio: {result['Portfolio']}")
+    print("\n")
+
+#%%
+profil = 'défensif'
+duration = 6
+frequency = 'quotidienne' # not used
+final_value, portfolio = simulate_combined_strategy(cleaned_data, risk_profile=profil, months=duration)
+print(f"Profil risque : {profil}")
+print(f"Durée : {duration} mois")
+print(f"Fréquence : {frequency}")
+print(f"Valeur finale du portefeuille : {final_value}")
+print(f"Composition finale du portefeuille : {portfolio}")
+
+#%%
+
+#%%
+
+#%%
