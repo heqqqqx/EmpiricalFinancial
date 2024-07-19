@@ -1,5 +1,14 @@
 import os
-from utils import *
+from datetime import datetime, timedelta
+import matplotlib.dates as mdates
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import yfinance as yf
+import seaborn as sns
+
+from utils import display_first_last_rows, count_observations, deduce_periodicity, descriptive_statistics, identify_missing_values, handle_missing_values, handle_anomalies, plot_stock_data_with_anomalies, calculate_average_prices, calculate_price_changes, ensure_date_column, calculate_daily_return, calculate_moving_average, plot_trends, calculate_volatility, calculate_performance, calculate_annualized_return, calculate_sharpe_ratio, calculate_correlation, plot_bollinger_bands, calculate_macd, calculate_rsi, plot_close_price_with_rsi, plot_macd, plot_rsi, plot_close_price_with_macd, plot_closing_price_and_ichimoku, process_and_plot_seasonality, calculate_ao, plot_close_price_with_ao, calculate_indicators, simulate_portfolio, simulate_combined_strategy
 tickers = ["AAPL", "MSFT","AMZN", "META", "GOOG", "TSLA", "ZM", ]
 start_date = (datetime.now() - timedelta(days=30*365)).strftime('%Y-%m-%d')
 end_date = datetime.now().strftime('%Y-%m-%d')

@@ -7,69 +7,29 @@ import matplotlib.pyplot as plt
 import yfinance as yf
 import seaborn as sns
 
-data = {}
-cleaned_data = {}
 def display_first_last_rows(df, n=40):
-    '''
-    Display the first and last n rows of a DataFrame
-    :param df (dataFrame): Input DataFrame
-    :param n: number of rows to display
-    :return: None, just print the first and last n rows of the DataFrame
-    '''
     print(df.head(n))
     print(df.tail(n))
 
 def count_observations(df):
-    ''' 
-    Count the number of observations in a DataFrame
-    :param df (dataFrame): Input DataFrame
-    :return: int, the number of observations in the DataFrame
-    '''
     return len(df)
 
 def deduce_periodicity(df):
-    '''
-    Deduce the periodicity of the data in a DataFrame
-    :param df (dataFrame): Input DataFrame
-    :return: str, the periodicity of the data
-    '''
     df.index = pd.to_datetime(df.index)
     diff = df.index.to_series().diff().dropna()
     return diff.mode()[0]
 
 def descriptive_statistics(df):
-    '''
-    Compute descriptive statistics for a DataFrame
-    :param df (dataFrame): Input DataFrame
-    :return: summary statistics for the data
-    '''
     return df.describe()
 
 def identify_missing_values(df):
-    '''
-    Identify missing values in a DataFrame
-    :param df (dataFrame): Input DataFrame
-    :return: Series, the number of missing values in each column
-    '''
     return df.isna().sum()
 
 def handle_missing_values(df):
-    '''
-    Handle missing values in a DataFrame
-    :param df (dataFrame): Input DataFrame
-    :return: dataFrame, the DataFrame with missing values handled
-    '''
     numeric_columns = df.select_dtypes(include=[np.number]).columns
     return df.fillna(df[numeric_columns].mean())
 
 def detect_anomalies(df, column, window=365):
-    '''
-    Detect anomalies in a time series data using the IQR (interquartile range) method
-    :param df (dataFrame): Input DataFrame
-    :param column (str): Column to detect anomalies
-    :param window (int): Window size for the rolling window
-    :return: dataFrame, the anomalies in the data
-    '''
     rolling_df = df[column].rolling(window=window, center=True)
     Q1 = rolling_df.quantile(0.25)
     Q3 = rolling_df.quantile(0.75)
@@ -79,97 +39,38 @@ def detect_anomalies(df, column, window=365):
     anomalies = df[(df[column] < lower_bound) | (df[column] > upper_bound)]
     return anomalies
 
-def handle_anomalies(df, column, stock_name,  window=365):
-    '''
-    Handle anomalies in a time series data using the rolling mean method
-    :param df (dataFrame): Input DataFrame
-    :param column (str): Column to handle anomalies
-    :param stock_name (str): Stock name
-    :param window (int): Window size for the rolling window
-    :return: dataFrame, the DataFrame with anomalies handled
-    '''
+def handle_anomalies(df, column, stock_name, window=365):
     anomalies = detect_anomalies(df, column)
-    plot_stock_data_with_anomalies(data, stock_name, column, is_anomalies=True)
+    plot_stock_data_with_anomalies(df, stock_name, column, anomalies, is_anomalies=True)
     print(f"Found {len(anomalies)} anomalies in {column}")
     df.loc[anomalies.index, column] = np.nan
     rolling_mean = df[column].rolling(window=window, center=True).mean()
     df.loc[:, column] = df[column].fillna(rolling_mean)
     return df
 
+def plot_stock_data_with_anomalies(df, stock_name, column, anomalies, is_anomalies=True):
+    plt.figure(figsize=(14, 7))
+    plt.plot(df.index, df[column], label='Data')
+    plt.scatter(anomalies.index, anomalies[column], color='red', label='Anomalies')
+
+    legend = f'{stock_name} - {column} with Anomalies' if is_anomalies else f'{stock_name} - {column} after Anomalies Handling'
+    plt.title(legend)
+    plt.xlabel('Date')
+    plt.ylabel(column)
+    plt.legend()
+    plt.show()
+
 def calculate_moving_average(df, column, window):
-    '''
-    Calculate the moving average for a column in a DataFrame
-    :param df (dataFrame): Input DataFrame
-    :param column (str): Column to calculate the moving average
-    :param window (int): Window size for the moving average
-    :return: dataFrame, the DataFrame with the moving average column added
-    '''
     df[f'MA_{window}'] = df[column].rolling(window=window).mean()
     return df
 
-def calculate_correlation(cleaned_data):
-    '''
-    Calculate the correlation between the returns of different stocks
-    :param cleaned_data (dict): Dictionary containing the cleaned stock data
-    :return: dataFrame, the correlation matrix
-    '''
-    returns = {ticker: df['Close'].pct_change(fill_method=None) for ticker, df in cleaned_data.items()}
-    return pd.DataFrame(returns).corr()
-
-def calculate_performance(df):
-    '''
-    Calculate the performance of a stock
-    :param df (dataFrame): Input DataFrame
-    :return: float, the performance of the stock
-    '''
-    initial_price = df['Close'].iloc[0]
-    final_price = df['Close'].iloc[-1]
-    return (final_price - initial_price) / initial_price
-
-def calculate_annualized_return(df):
-    '''
-    Calculate the annualized return of a stock
-    :param df (dataFrame): Input DataFrame
-    :return: float, the annualized return of the stock
-    '''
-    initial_price = df['Close'].iloc[0]
-    final_price = df['Close'].iloc[-1]
-    print(df.head())
-    print(df.tail())
-    start_date = df['Date'].iloc[0]
-    end_date = df['Date'].iloc[-1]
-    n_years = (end_date- start_date).days / 365.25
-    return (final_price / initial_price) ** (1 / n_years) - 1
-
-def calculate_volatility(df):
-    '''
-    Calculate the volatility of a stock
-    :param df (dataFrame): Input DataFrame
-    :return: float, the volatility of the stock
-    '''
-    df['daily_return'] = df['Close'].pct_change(fill_method=None)
-    df['Volatility'] = df['daily_return'].std()
-    return df['daily_return'].std()
-
 def calculate_sharpe_ratio(df, risk_free_rate=0.01):
-    '''
-    Calculate the Sharpe ratio of a stock
-    :param df (dataFrame): Input DataFrame
-    :param risk_free_rate (float): Risk-free rate
-    :return: float, the Sharpe ratio of the stock
-    '''
     df['daily_return'] = df['Close'].pct_change(fill_method=None)
     mean_return = df['daily_return'].mean()
     std_dev = df['daily_return'].std()
     return (mean_return - risk_free_rate) / std_dev
 
 def plot_trends(df, ticker):
-    '''
-    Plot the trends for a stock
-    :param df (dataFrame): Input DataFrame
-    :param ticker (str): Stock ticker
-    :return: None, just plot the trends
-    '''
     plt.figure(figsize=(14, 7))
     df_filtered = df[df['Date'] >= datetime.now() - timedelta(days=3*365)]
     plt.plot(df_filtered['Date'], df_filtered['Close'], label='Close Price')
