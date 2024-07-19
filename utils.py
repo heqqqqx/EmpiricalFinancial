@@ -6,6 +6,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import yfinance as yf
 import seaborn as sns
+
+data = {}
+cleaned_data = {}
 def display_first_last_rows(df, n=40):
     '''
     Display the first and last n rows of a DataFrame
@@ -589,6 +592,44 @@ def process_and_plot_seasonality(start_year):
         df = calculate_monthly_returns(df)
         seasonality_table = create_seasonality_table(df, start_year)
         plot_seasonality_table(seasonality_table, ticker)
+def ensure_datetime_index(df):
+    """
+    Ensure that the DataFrame has a datetime index.
+    :param df (pd.DataFrame): Input DataFrame
+    :return: pd.DataFrame with datetime index
+    """
+    if df.index.name != 'Date':
+        if 'Date' in df.columns:
+            df['Date'] = pd.to_datetime(df['Date'])
+            df.set_index('Date', inplace=True)
+    return df
+
+def calculate_indicators(df):
+    df = ensure_datetime_index(df)
+
+    # RSI
+    df = calculate_rsi(df)
+
+    # MACD
+    df = calculate_macd(df)
+
+    # Awesome Oscillator (AO)
+    df = calculate_ao(df)
+
+    # Ichimoku
+    df = calculate_ichimoku(df)
+
+    # Moving Averages
+    df = calculate_moving_average(df, 'Close', 20)
+    df = calculate_moving_average(df, 'Close', 50)
+
+    # Bollinger Bands
+    df = calculate_bollinger_bands(df)
+
+    # Seasonality
+    df = calculate_monthly_returns(df)
+
+    return df
 
 def calculate_ao(df, short_window=5, long_window=34):
     """
@@ -657,7 +698,7 @@ def simulate_portfolio(data, initial_balance=10000, risk_profile='modéré', str
     :return: dict, the portfolio with the stock allocations
     '''
     allocations = {
-        'conservateur': {'AAPL': 0.15, 'MSFT': 0.15, 'AMZN': 0.15, 'GOOG': 0.15, 'TSLA': 0.15, 'ZM': 0.15, 'META': 0.15},
+        'défensif': {'AAPL': 0.15, 'MSFT': 0.15, 'AMZN': 0.15, 'GOOG': 0.15, 'TSLA': 0.15, 'ZM': 0.15, 'META': 0.15},
         'modéré': {'AAPL': 0.15, 'MSFT': 0.15, 'AMZN': 0.15, 'GOOG': 0.15, 'TSLA': 0.15, 'ZM': 0.15, 'META': 0.15},
         'agressif': {'AAPL': 0.15, 'MSFT': 0.15, 'AMZN': 0.15, 'GOOG': 0.15, 'TSLA': 0.15, 'ZM': 0.15, 'META': 0.15},
         'everything': {'AAPL': 0.15, 'MSFT': 0.15, 'AMZN': 0.15, 'GOOG': 0.15, 'TSLA': 0.15, 'ZM': 0.15, 'META': 0.15}
@@ -802,14 +843,14 @@ def simulate_portfolio(data, initial_balance=10000, risk_profile='modéré', str
 
 def simulate_combined_strategy(data, initial_balance=10000, risk_profile='everything', months=6):
     allocations = {
-        'conservateur': {'AAPL': 0.15, 'MSFT': 0.15, 'AMZN': 0.15, 'GOOG': 0.15, 'TSLA': 0.15, 'ZM': 0.15, 'META': 0.15},
+        'défensif': {'AAPL': 0.15, 'MSFT': 0.15, 'AMZN': 0.15, 'GOOG': 0.15, 'TSLA': 0.15, 'ZM': 0.15, 'META': 0.15},
         'modéré': {'AAPL': 0.15, 'MSFT': 0.15, 'AMZN': 0.15, 'GOOG': 0.15, 'TSLA': 0.15, 'ZM': 0.15, 'META': 0.15},
         'agressif': {'AAPL': 0.15, 'MSFT': 0.15, 'AMZN': 0.15, 'GOOG': 0.15, 'TSLA': 0.15, 'ZM': 0.15, 'META': 0.15},
         'everything': {'AAPL': 0.15, 'MSFT': 0.15, 'AMZN': 0.15, 'GOOG': 0.15, 'TSLA': 0.15, 'ZM': 0.15, 'META': 0.15}
     }
 
     risk_parameters = {
-        'conservateur': {'buy_threshold': 2, 'sell_threshold': 1},
+        'défensif': {'buy_threshold': 2, 'sell_threshold': 1},
         'modéré': {'buy_threshold': 1, 'sell_threshold': 2},
         'agressif': {'buy_threshold': 1, 'sell_threshold': 3}
     }
@@ -920,3 +961,12 @@ def simulate_combined_strategy(data, initial_balance=10000, risk_profile='everyt
             final_value += shares * data[ticker].loc[last_date, 'Close']
 
     return final_value, portfolio
+
+def calculate_daily_return(df):
+    df['Daily Return'] = (df['Close'] - df['Open']) / df['Open']
+    return df
+
+def ensure_date_column(df):
+    if df.index.name == 'Date':
+        df = df.reset_index()
+    return df
